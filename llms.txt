@@ -1,0 +1,83 @@
+# cobweb.market
+
+> cobweb-py is a Python-native stock backtesting and simulation API designed for retail quants who need institutional-grade execution modeling.
+
+## What it does
+
+cobweb-py provides three core capabilities via a REST API and Python SDK:
+
+1. **Technical Features** — Compute 71 technical indicators from OHLCV data (momentum, trend, MACD, RSI, volatility, Bollinger Bands, mean reversion, stochastic, volume, risk, beta, regime detection). Features are lazily evaluated server-side.
+
+2. **Realistic Backtesting** — Run signal-based backtests with a full execution model: bid-ask spread, base slippage, market impact (square-root model), participation rate caps, multi-bar order slicing, and broker fees. Three presets: intraday, swing, longterm.
+
+3. **27 Plot Types** — Generate chart payloads for equity curves, drawdowns, rolling Sharpe/Sortino, regime performance, trade analysis, volume diagnostics, correlation heatmaps, and more.
+
+## Key differentiator
+
+Unlike most retail backtesting frameworks that assume instant fills at quoted prices, cobweb-py models hidden transaction costs (spread, slippage, market impact) that typically account for 4-8% of returns in live trading. This closes the gap between backtest results and live performance.
+
+## Quick install
+
+```
+pip install cobweb-py
+```
+
+No API key required for the free tier.
+
+## API endpoints
+
+- Base URL: https://web-production-83f3e.up.railway.app
+- `GET /health` — Health check
+- `POST /features` — Compute technical features from OHLCV data
+- `POST /backtest` — Run backtest with signals and execution modeling
+- `POST /plots` — Generate chart payloads from backtest results
+
+## Python SDK quickstart
+
+```python
+import yfinance as yf
+from cobweb_py import CobwebSim, BacktestConfig, fix_timestamps
+
+df = yf.download("SPY", start="2020-01-01", end="2024-12-31")
+df.columns = df.columns.get_level_values(0)
+df = df.reset_index().rename(columns={"Date": "timestamp"})
+rows = df[["timestamp","Open","High","Low","Close","Volume"]].to_dict("records")
+data = fix_timestamps(rows)
+
+sim = CobwebSim("https://web-production-83f3e.up.railway.app")
+
+close = df["Close"].values
+sma50 = df["Close"].rolling(50).mean().values
+signals = [1.0 if c > s else 0.0 for c, s in zip(close, sma50)]
+signals[:50] = [0.0] * 50
+
+bt = sim.backtest(data, signals=signals,
+    config=BacktestConfig(exec_horizon="swing", initial_cash=100_000))
+
+print(f"Return: {bt['metrics']['total_return']:.2%}")
+print(f"Sharpe: {bt['metrics']['sharpe_ann']:.2f}")
+```
+
+## Execution model details
+
+Every trade passes through:
+- Half-spread (bid-ask crossing cost)
+- Base slippage (fixed bps)
+- Market impact: impact_coeff x vol_bps x sqrt(participation)
+- Broker fee (flat bps on notional)
+- Participation cap (max % of bar volume per fill)
+- Multi-bar slicing (unfilled quantity carries forward)
+
+Horizon presets:
+- intraday: 2% max participation, 1.25 impact coeff
+- swing: 8% max participation, 1.0 impact coeff
+- longterm: 15% max participation, 0.8 impact coeff
+
+## Links
+
+- Website: https://cobweb.market
+- Documentation: https://cobweb.market/docs.html
+- Blog: https://cobweb.market/blog.html
+- API docs (Swagger): https://web-production-83f3e.up.railway.app/docs
+- GitHub: https://github.com/cobwebSim/StockSim-
+- PyPI: https://pypi.org/project/cobweb-py/
