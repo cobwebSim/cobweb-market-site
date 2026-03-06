@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Why Your Backtest Is Lying to You — 7 Hidden Biases Killing Your Strategy | cobweb.market</title>
+  <meta name="description" content="Why your backtest results don't match live trading. Learn the 7 ways backtesting frameworks inflate returns — look-ahead bias, unrealistic fills, hidden transaction costs — and how to build an optimum backtest with realistic execution modeling. Good backtest practices for Python quants.">
+  <meta name="keywords" content="backtest accuracy, backtesting mistakes, optimum backtest, good backtest, realistic backtesting, backtest vs live trading, algorithmic trading, quantitative finance, backtesting Python, systematic trading, trading infrastructure, retail quant, Sharpe ratio, overfitting, look-ahead bias, market microstructure, slippage modeling, transaction cost analysis, backtest framework comparison, best backtesting engine">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://cobweb.market/blog/why-your-backtest-is-lying.html">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Why Your Backtest Is Lying to You — 7 Hidden Biases Killing Your Strategy">
+  <meta property="og:description" content="The 7 ways backtesting frameworks silently inflate returns — and how to build strategies that survive live trading. Includes naive vs. realistic comparison data.">
+  <meta property="og:url" content="https://cobweb.market/blog/why-your-backtest-is-lying.html">
+  <meta property="og:site_name" content="cobweb.market">
+  <meta property="og:image" content="https://cobweb.market/why-your-backtest-is-lying-to-you.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="article:published_time" content="2026-03-06T00:00:00Z">
+  <meta property="article:tag" content="backtesting">
+  <meta property="article:tag" content="algorithmic trading">
+  <meta property="article:tag" content="quantitative finance">
+  <meta property="article:tag" content="Python">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Why Your Backtest Is Lying to You — 7 Hidden Biases">
+  <meta name="twitter:description" content="$749 in hidden friction at $10K scales to $83,973 at $1M. Here are the 7 ways your backtesting framework is silently inflating returns.">
+  <meta name="twitter:image" content="https://cobweb.market/why-your-backtest-is-lying-to-you.png">
+
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Why Your Backtest Is Lying to You — 7 Hidden Biases Killing Your Strategy",
+    "description": "The 7 ways backtesting frameworks silently inflate returns and how to build strategies that survive live trading.",
+    "image": "https://cobweb.market/why-your-backtest-is-lying-to-you.png",
+    "datePublished": "2026-03-06",
+    "author": {
+      "@type": "Organization",
+      "name": "cobweb.market",
+      "url": "https://cobweb.market"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "cobweb.market",
+      "url": "https://cobweb.market"
+    },
+    "mainEntityOfPage": "https://cobweb.market/blog/why-your-backtest-is-lying.html",
+    "keywords": ["backtest accuracy", "optimum backtest", "good backtest", "backtesting mistakes", "realistic backtesting", "algorithmic trading", "Python backtesting", "look-ahead bias", "transaction costs", "slippage modeling"]
+  }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    .blog-post img {
+      width: 100%;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      margin: 24px 0;
+    }
+    .blog-post .cover-section {
+      text-align: center;
+      margin-bottom: 40px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+    }
+    .blog-post .cover-section .cover-img {
+      width: 280px;
+      display: block;
+      margin: 0 auto 28px;
+      border-radius: var(--radius);
+      border: none;
+    }
+    .blog-post .cover-section h1 {
+      margin-bottom: 10px;
+    }
+    .blog-post .cover-section .meta {
+      margin-bottom: 16px;
+    }
+    .blog-post .cover-section .subtitle {
+      color: var(--text-muted);
+      font-style: italic;
+      max-width: 540px;
+      margin: 0 auto;
+    }
+    .blog-post .img-caption {
+      font-size: 13px;
+      color: var(--text-muted);
+      text-align: center;
+      font-style: italic;
+      margin: -16px 0 24px;
+    }
+    .blog-post blockquote {
+      border-left: 3px solid var(--accent);
+      padding: 12px 20px;
+      margin: 20px 0;
+      background: var(--accent-glow);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: var(--text);
+      font-style: italic;
+    }
+    .blog-post hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 40px 0;
+    }
+    .cta-box {
+      background: var(--bg-card);
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 32px;
+      margin: 40px 0;
+      text-align: center;
+    }
+    .cta-box h3 {
+      color: var(--text);
+      margin: 0 0 12px;
+    }
+    .cta-box p {
+      color: var(--text-muted);
+      margin-bottom: 20px;
+    }
+    .cta-box .install-bar {
+      max-width: 340px;
+      margin: 0 auto 20px;
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 20px;
+      font-family: var(--mono);
+      font-size: 15px;
+      color: var(--green);
+      text-align: left;
+      user-select: all;
+    }
+    .cta-box .install-bar .prompt { color: var(--text-muted); }
+    .blog-post .wide-img {
+      max-width: none;
+      width: calc(100% + 160px);
+      margin-left: -80px;
+    }
+    @media (max-width: 768px) {
+      .blog-post .wide-img {
+        width: 100%;
+        margin-left: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="../index.html" class="logo">cobweb<span>.market</span></a>
+    <ul class="nav-links">
+      <li><a href="../docs.html">Docs</a></li>
+      <li><a href="../blog.html" class="active">Blog</a></li>
+      <li><a href="https://web-production-83f3e.up.railway.app/docs" target="_blank">API</a></li>
+      <li><a href="https://github.com/cobwebSim/StockSim-" target="_blank">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<article class="blog-post">
+
+  <div class="cover-section">
+    <img class="cover-img" src="../why-your-backtest-is-lying-to-you.png" alt="Why Your Backtest Is Lying to You — cobweb.market">
+    <h1>Why Your Backtest Is Lying to You</h1>
+    <p class="meta">2026-03-06</p>
+    <p class="subtitle">The uncomfortable truth about retail quant infrastructure &mdash; and how to finally build strategies that hold up in live trading.</p>
+  </div>
+
+  <p>You've been here before. You run a backtest. The equity curve looks beautiful &mdash; a clean, ascending staircase with a Sharpe ratio above 2.0 and a max drawdown you could live with. You feel the familiar rush of having found something real. Then you go live, and within six weeks, the strategy has given back half its paper gains.</p>
+
+  <p>This isn't bad luck. It's infrastructure.</p>
+
+  <p>Most backtesting frameworks &mdash; the ones that are free, widely documented, and easy to get started with &mdash; are quietly optimistic by default. They were built for speed and convenience, not rigor. And the gap between what they show you and what the market actually delivers has ended careers, blown up accounts, and convinced talented people that systematic trading simply "doesn't work for retail."</p>
+
+  <p>It does work. But only if your backtesting engine is telling you the truth.</p>
+
+  <hr>
+
+  <h2>The Retail Quant Trap: Sophistication Without Infrastructure</h2>
+
+  <p>There's never been a better time to be a retail quant, at least on the surface. You have access to high-quality tick data, cloud compute, Python libraries that implement everything from momentum factors to transformer-based regime detection, and broker APIs that can execute complex multi-leg strategies at near-zero commission.</p>
+
+  <p>But there's an asymmetry. The <em>strategy</em> side of the stack has been thoroughly democratized. The <em>validation</em> side hasn't.</p>
+
+  <p>Institutional desks have entire teams dedicated to ensuring backtests reflect reality: execution specialists who model market impact, risk teams who stress-test assumptions, engineers who maintain the simulation environment with the same care as production systems. When a stat arb desk at a hedge fund backtests a strategy, the backtest is adversarial by design. It's trying to find reasons the strategy <em>won't</em> work before money is on the line.</p>
+
+  <p>Retail quants are building on engines designed to answer a simpler question: "Would this have made money?" That's the wrong question. The right question is: <strong>"Would this have made money, accounting for every real-world friction, at the exact sizing and frequency I intend to trade it?"</strong></p>
+
+  <p>The difference between those two questions is where returns go to die.</p>
+
+  <hr>
+
+  <h2>The Seven Ways Your Backtest Is Optimistic</h2>
+
+  <h3>1. Look-Ahead Bias: The Silent Killer</h3>
+
+  <p>Look-ahead bias occurs when your backtest uses information that wouldn't have been available at the time a decision was made. It sounds obvious, and every backtesting tutorial mentions it &mdash; but it is astonishingly easy to introduce accidentally.</p>
+
+  <p>Consider a simple case: you're using daily OHLC data and triggering trades on the close. Many frameworks process the entire day's bar before evaluating signals, which means your signal can technically "see" that day's close before deciding whether to trade on it. You've used the outcome to make the decision.</p>
+
+  <p>Or consider feature engineering. If you normalize a price series using its full-sample mean and standard deviation before splitting into train and test sets, future data has leaked into past signals. Your model has, in effect, read tomorrow's newspaper.</p>
+
+  <p>A robust backtesting engine needs to enforce a strict event-time model: every data point has a timestamp representing <em>when it became known</em>, not when the underlying event occurred. This distinction is the difference between a correct simulation and a fairy tale.</p>
+
+  <h3>2. Fill Assumptions That Were Never True</h3>
+
+  <p>How does your backtest assume your orders get filled?</p>
+
+  <p>For most retail-grade frameworks, the default is something like: "If a bar crosses your limit price, you're filled at that price." Or, even more aggressively: "Market orders are filled at the open of the next bar."</p>
+
+  <p>These assumptions borrow heavily from a world of unlimited liquidity, zero market impact, and a broker that processes your order before anyone else's. None of that is true.</p>
+
+  <p>The correct approach is probabilistic fill modeling. Your engine should track whether volume at the target price was sufficient to absorb your order, and should simulate partial fills, slippage distributions, and queue position.</p>
+
+  <h3>3. Transaction Costs: The Tax You're Underpaying</h3>
+
+  <p>"But I account for commissions," you say. And you probably do &mdash; a flat per-share or per-contract cost that covers the explicit broker fee. What you're likely <em>not</em> accounting for:</p>
+
+  <p><strong>Bid-ask spread.</strong> Every round-trip involves crossing the spread at least partially. For a strategy with a 5 bps expected edge trading a stock with a 10 bps spread, you don't have an edge &mdash; you have a slow bleed.</p>
+
+  <p><strong>Market impact.</strong> Your orders change the price, especially on the close of an order flow burst. A strategy that trades 10% of average daily volume in a single session is not a price taker. It's a price mover.</p>
+
+  <p><strong>Borrow costs for short positions.</strong> Hard-to-borrow names can cost 20&ndash;40% annualized, sometimes more.</p>
+
+  <p><strong>Funding costs for leveraged positions.</strong> Margin has a cost. If your strategy is levered, the interest drag is part of the P&amp;L calculation.</p>
+
+  <p>A complete transaction cost model is arguably the single most impactful improvement you can make to a retail backtest. Strategies that look like 15% annualized net of commissions often look like 6% net of full costs.</p>
+
+  <h3>4. Survivorship Bias: The Graveyard You're Ignoring</h3>
+
+  <p>If you build and test equity strategies using a dataset of currently listed stocks, you have a survivorship problem. The companies that failed, merged, or delisted between your backtest start date and today are absent from your universe &mdash; but they were present in the market during that period.</p>
+
+  <p>This matters enormously for strategies with any mean-reversion or value tilt. Those strategies tend to buy companies that look cheap relative to their history. Companies that ultimately go to zero look very cheap just before they do.</p>
+
+  <h3>5. Overfitting: The Optimization Trap</h3>
+
+  <p>When your framework makes it easy to run hundreds of parameter combinations and visualize their equity curves, you will overfit. Not because you're being sloppy, but because human pattern recognition is very good at finding structure in noise.</p>
+
+  <p>The corrective isn't to avoid optimization &mdash; it's to correct for it. Walk-forward analysis, combinatorial purged cross-validation (CPCV), and Monte Carlo permutation testing are not exotic academic tools. They're necessary hygiene for any systematic strategy.</p>
+
+  <p>The question isn't "does this parameter set have a good historical Sharpe?" It's "what is the probability that this historical Sharpe could be explained by randomness alone?"</p>
+
+  <h3>6. Regime Blindness: One Backtest Doesn't Cover All Markets</h3>
+
+  <p>Equity markets from 2010 to 2021 were characterized by low volatility, central bank suppression of tail risk, persistent momentum in growth names, and essentially zero cost of carry for long positions. A backtest that looks good over that period doesn't tell you much about how a strategy would behave in a high-inflation, rising-rate environment &mdash; the environment that showed up in 2022.</p>
+
+  <p>A good backtesting engine should make regime analysis easy, not an afterthought.</p>
+
+  <h3>7. Timestamp and Time Zone Failures</h3>
+
+  <p>Financial data comes from dozens of different vendors, exchanges, and asset classes, each with its own conventions for timestamps, time zones, daylight saving time handling, and bar construction. When you merge these data sources in a backtest, misalignments of even a single minute can introduce look-ahead bias, phantom arbitrage signals, or execution timestamps that don't correspond to any real trading session.</p>
+
+  <p>The fix is a strict, unified timestamp model across all data sources &mdash; and an engine that enforces it rather than leaving it to the strategy developer to manage manually.</p>
+
+  <hr>
+
+  <h2>What Rigorous Backtesting Infrastructure Actually Looks Like</h2>
+
+  <p>The challenges above are not one-off bugs you can fix by reviewing your code more thoroughly. They're structural. Here's what proper infrastructure needs to provide:</p>
+
+  <ul>
+    <li><strong>A strict event-time model.</strong> Every data point must carry a knowledge timestamp distinct from an event timestamp.</li>
+    <li><strong>Realistic order execution simulation.</strong> Partial fills, slippage from empirical distributions, and market impact that scales with order size relative to liquidity.</li>
+    <li><strong>Complete cost accounting.</strong> Spread, borrow costs, funding costs, and instrument-specific fees &mdash; not just commissions.</li>
+    <li><strong>Point-in-time universe and data management.</strong> The engine should know what was known on any given historical date.</li>
+    <li><strong>Built-in statistical validation.</strong> Walk-forward testing, permutation tests, and cross-validation as first-class features.</li>
+    <li><strong>Regime analysis tooling.</strong> Performance decomposition by market regime, volatility state, or macroeconomic environment.</li>
+    <li><strong>Unified data handling.</strong> Timestamps, time zones, and normalization handled consistently for every asset class.</li>
+  </ul>
+
+  <hr>
+
+  <h2>Naive vs. Realistic: The Difference in Practice</h2>
+
+  <p>To make this concrete, here's a side-by-side comparison of the same momentum strategy backtested two ways. Both engines use 1 bps fee and fill at next-bar open &mdash; the <em>only</em> difference is that the realistic engine (cobweb-py) adds slippage, spread, and market impact modeling.</p>
+
+  <img class="wide-img" src="backtest-comparison.png" alt="Comparison of naive vs realistic backtesting across $10K and $1M portfolios showing equity curves, cumulative hidden friction, and drawdown differences">
+  <p class="img-caption">Same strategy, same data, same fee &mdash; but $749 in hidden friction at $10K scales to $83,973 at $1M. Drawdowns run 2+ percentage points deeper when you model real execution.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th></th>
+        <th>$10K</th>
+        <th>$1M</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Naive final equity</td>
+        <td>$18,268.64</td>
+        <td>$1,826,863.59</td>
+      </tr>
+      <tr>
+        <td>Realistic final equity</td>
+        <td>$17,519.82</td>
+        <td>$1,742,890.21</td>
+      </tr>
+      <tr>
+        <td><strong>Hidden friction</strong></td>
+        <td><strong style="color: var(--red);">$748.81</strong></td>
+        <td><strong style="color: var(--red);">$83,973.38</strong></td>
+      </tr>
+      <tr>
+        <td>Naive max drawdown</td>
+        <td>-21.0%</td>
+        <td>-21.0%</td>
+      </tr>
+      <tr>
+        <td>Realistic max drawdown</td>
+        <td>-23.2%</td>
+        <td>-23.3%</td>
+      </tr>
+      <tr>
+        <td><strong>Drawdown gap</strong></td>
+        <td><strong style="color: var(--orange);">2.2pp</strong></td>
+        <td><strong style="color: var(--orange);">2.3pp</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>The top row shows equity curves diverging over time as realistic friction compounds. The middle row isolates the cumulative hidden cost &mdash; the gap between what a naive backtest promises and what you'd actually keep. The bottom row reveals deeper drawdowns under realistic conditions, exactly the kind of risk that gets missed by optimistic engines.</p>
+
+  <p>At $10K, the gap is manageable. At $1M, it's nearly $84,000 in phantom returns your naive backtest told you were real. This is the tax you pay for trusting an engine that doesn't model execution.</p>
+
+  <hr>
+
+  <h2>The Cost of Getting This Wrong</h2>
+
+  <p>Assume you have a strategy with a true Sharpe of 0.9 &mdash; genuinely positive-expectation, worth running. Your backtest, due to the combination of errors above, reports a Sharpe of 1.8. You size the strategy based on the backtested characteristics and allocate $100,000.</p>
+
+  <p>Based on the backtested metrics, your actual 5-percentile drawdown is roughly twice as large as expected. You hit it within the first year. You close the strategy, concluding it "stopped working."</p>
+
+  <p>But it was always going to work at the level the true Sharpe suggested. You just sized it for a strategy twice as good as the one you had.</p>
+
+  <p>This is the retail quant lifecycle for an enormous number of practitioners. Not because they're building bad strategies, but because they're validating them with tools that aren't adversarial enough to reveal the truth.</p>
+
+  <hr>
+
+  <h2>Why Most Quants Don't Fix This (Yet)</h2>
+
+  <ul>
+    <li><strong>Path dependence.</strong> Most retail quants learned backtesting using one of a handful of popular frameworks. Relearning has an upfront cost.</li>
+    <li><strong>The illusion of working.</strong> Flawed backtests produce output. They produce equity curves and statistics and tearsheets. Nothing visibly breaks. The failure mode is invisible until you're live and losing money.</li>
+    <li><strong>Framework inertia.</strong> A quant who has spent 18 months building a library of strategies on a given framework has a strong incentive to stay on it.</li>
+    <li><strong>Availability of alternatives.</strong> Until recently, the genuinely rigorous options were either institutional (not available to retail) or impractical to use in production.</li>
+  </ul>
+
+  <p>That last constraint is changing.</p>
+
+  <hr>
+
+  <h2>A Better Way Forward</h2>
+
+  <p>The right tool doesn't just run your strategy against historical data. It interrogates your strategy. It asks whether your fills are realistic. It checks whether your signals are clean of look-ahead contamination. It tells you what your performance would have looked like across regimes you haven't lived through yet. It surfaces the gap between your gross backtest and your net-of-everything reality.</p>
+
+  <p><strong>This is exactly what cobweb-py was built to do.</strong></p>
+
+  <p>cobweb-py is a Python-native backtesting engine designed from first principles around simulation fidelity. It handles the structural problems outlined in this post at the infrastructure level: enforcing strict event-time semantics, simulating realistic fills against volume data, applying complete cost accounting, and surfacing statistical validation as a core workflow.</p>
+
+  <p>It works with pandas DataFrames and numpy arrays, integrates cleanly with Jupyter-based research environments, and outputs results in formats compatible with the statistical libraries you're already using.</p>
+
+  <p>More importantly, it's adversarial by design. It's trying to find reasons your strategy <em>won't</em> work before you put real money on it.</p>
+
+  <hr>
+
+  <h2>Three Questions to Ask Your Current Backtest</h2>
+
+  <p>Before you look at any new tooling, run this diagnostic on your current setup.</p>
+
+  <p><strong>Question 1: What is my backtest's fill assumption for limit orders?</strong><br>
+  If the answer is "filled whenever the bar crosses my price," your backtest is likely too optimistic. A realistic engine should require sufficient volume at price and model partial fills.</p>
+
+  <p><strong>Question 2: Does my cost model include spread, borrow, and funding &mdash; or just commissions?</strong><br>
+  Calculate the all-in cost per round-trip. If your cost assumption is less than 1.5x your explicit commission, you're almost certainly underestimating.</p>
+
+  <p><strong>Question 3: Can I run a permutation test on my backtest results?</strong><br>
+  Shuffle your signal randomly and run the same backtest. If your actual Sharpe doesn't clearly stand apart from the distribution of shuffled Sharpe ratios, you may not have an edge. You have noise that fits historical data.</p>
+
+  <hr>
+
+  <h2>The Bottom Line</h2>
+
+  <p>Systematic trading works. The math is real, the edges are real, and the systematic approach to markets is a genuine and durable source of alpha for practitioners who execute it correctly.</p>
+
+  <p>But "correctly" starts with infrastructure. A strategy that produces a 1.8 Sharpe on a flawed backtest and a 0.6 Sharpe in live trading isn't a failed strategy &mdash; it's an untested one.</p>
+
+  <p>Real validation is adversarial. It assumes fills are hard to get. It taxes every transaction fully. It checks whether performance holds across regimes and survives statistical stress tests. It asks whether your results are signal or noise before your capital is the one making the bet.</p>
+
+  <p>The tools to do this rigorously &mdash; at retail scale, in Python, without an institutional infrastructure team &mdash; now exist.</p>
+
+  <p>The question is whether you'll use them before the market teaches you why you should have.</p>
+
+  <hr>
+
+  <!-- CTA: Get Started -->
+  <div class="cta-box">
+    <h3>Get started in 30 seconds</h3>
+    <p>Install cobweb-py and run your first friction-aware backtest.</p>
+    <div class="install-bar">
+      <span class="prompt">$</span> pip install cobweb-py
+    </div>
+    <a href="quickstart-backtest.html" class="btn btn-primary" style="margin-top: 4px;">Read the quickstart &rarr;</a>
+  </div>
+
+  <h2>30 Lines to a Full Backtest</h2>
+  <pre><span class="kw">import</span> yfinance <span class="kw">as</span> yf
+<span class="kw">from</span> cobweb_py <span class="kw">import</span> CobwebSim, BacktestConfig, fix_timestamps, print_signal
+<span class="kw">from</span> cobweb_py.plots <span class="kw">import</span> save_equity_plot, save_metrics_table
+
+<span class="cm"># 1. Grab SPY data</span>
+df = yf.<span class="fn">download</span>(<span class="str">"SPY"</span>, start=<span class="str">"2020-01-01"</span>, end=<span class="str">"2024-12-31"</span>)
+df.columns = df.columns.<span class="fn">get_level_values</span>(<span class="num">0</span>)
+df = df.<span class="fn">reset_index</span>().<span class="fn">rename</span>(columns={<span class="str">"Date"</span>: <span class="str">"timestamp"</span>})
+rows = df[[<span class="str">"timestamp"</span>,<span class="str">"Open"</span>,<span class="str">"High"</span>,<span class="str">"Low"</span>,<span class="str">"Close"</span>,<span class="str">"Volume"</span>]].<span class="fn">to_dict</span>(<span class="str">"records"</span>)
+data = <span class="fn">fix_timestamps</span>(rows)
+
+<span class="cm"># 2. Connect (free, no key needed)</span>
+sim = <span class="fn">CobwebSim</span>(<span class="str">"https://web-production-83f3e.up.railway.app"</span>)
+
+<span class="cm"># 3. Simple momentum: long when price &gt; 50-day SMA</span>
+close = df[<span class="str">"Close"</span>].values
+sma50 = df[<span class="str">"Close"</span>].<span class="fn">rolling</span>(<span class="num">50</span>).<span class="fn">mean</span>().values
+signals = [<span class="num">1.0</span> <span class="kw">if</span> c &gt; s <span class="kw">else</span> <span class="num">0.0</span> <span class="kw">for</span> c, s <span class="kw">in</span> <span class="fn">zip</span>(close, sma50)]
+signals[:<span class="num">50</span>] = [<span class="num">0.0</span>] * <span class="num">50</span>
+
+<span class="cm"># 4. Backtest with realistic friction</span>
+bt = sim.<span class="fn">backtest</span>(data, signals=signals,
+    config=<span class="fn">BacktestConfig</span>(exec_horizon=<span class="str">"swing"</span>, initial_cash=<span class="num">100_000</span>))
+
+<span class="cm"># 5. Results</span>
+<span class="fn">print</span>(f<span class="str">"Return:  {bt['metrics']['total_return']:.2%}"</span>)
+<span class="fn">print</span>(f<span class="str">"Sharpe:  {bt['metrics']['sharpe_ann']:.2f}"</span>)
+<span class="fn">print</span>(f<span class="str">"Max DD:  {bt['metrics']['max_drawdown']:.2%}"</span>)
+<span class="fn">print</span>(f<span class="str">"Trades:  {bt['metrics']['trades']}"</span>)
+<span class="fn">print_signal</span>(bt)
+<span class="fn">save_equity_plot</span>(bt, out_html=<span class="str">"equity.html"</span>)
+<span class="fn">save_metrics_table</span>(bt, out_html=<span class="str">"metrics.html"</span>)</pre>
+
+  <p><a href="../blog.html">&larr; Back to blog</a></p>
+
+</article>
+
+<footer>
+  <p>cobweb.market &copy; 2025 &middot; <a href="https://github.com/cobwebSim/StockSim-">GitHub</a> &middot; <a href="https://web-production-83f3e.up.railway.app/docs">API</a> &middot; <a href="../docs.html">Docs</a></p>
+</footer>
+
+</body>
+</html>
