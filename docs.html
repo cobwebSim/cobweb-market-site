@@ -118,7 +118,7 @@ pip install cobweb-py[viz]</pre>
     <p>Check API status. Returns <code>{"status": "ok", "version": "0.1.0"}</code>.</p>
 
     <h3>sim.enrich(data, feature_ids)</h3>
-    <p>Compute technical features from OHLCV data. Returns rows with feature columns appended.</p>
+    <p>Compute technical features from OHLCV data. Returns rows with feature columns appended. Alias: <code>sim.features()</code>.</p>
     <pre>feats = sim.<span class="fn">enrich</span>(<span class="str">"stock.csv"</span>, feature_ids=[<span class="num">1</span>, <span class="num">11</span>, <span class="num">36</span>])
 rows = feats[<span class="str">"rows"</span>]              <span class="cm"># OHLCV + ret_1d, sma_20, rsi_14</span>
 cols = feats[<span class="str">"feature_columns"</span>]   <span class="cm"># ['ret_1d', 'sma_20', 'rsi_14']</span></pre>
@@ -160,21 +160,44 @@ pl[<span class="str">"payloads"</span>]  <span class="cm"># dict of plot data ke
       <tr><td><code>max_leverage</code></td><td><code>1.0</code></td><td>Maximum leverage allowed</td></tr>
       <tr><td><code>allow_margin</code></td><td><code>false</code></td><td>Allow margin/short positions</td></tr>
       <tr><td><code>rebalance_mode</code></td><td><code>"on_signal_change"</code></td><td><code>on_signal_change</code> | <code>every_bar</code> | <code>calendar</code></td></tr>
+      <tr><td><code>max_participation</code></td><td><code>None</code></td><td>Max fraction of bar volume per trade (overrides horizon default)</td></tr>
+      <tr><td><code>rebalance_every_n_bars</code></td><td><code>0</code></td><td>Bar interval for <code>calendar</code> rebalance mode</td></tr>
       <tr><td><code>buy_threshold</code></td><td><code>0.10</code></td><td>Exposure threshold to trigger buy</td></tr>
       <tr><td><code>sell_threshold</code></td><td><code>-0.10</code></td><td>Exposure threshold to trigger sell</td></tr>
+      <tr><td><code>min_trade_units</code></td><td><code>0.0</code></td><td>Minimum trade size in units</td></tr>
+      <tr><td><code>max_order_age_bars</code></td><td><code>0</code></td><td>Max bars a pending order stays alive (0 = unlimited)</td></tr>
+      <tr><td><code>risk_free_annual</code></td><td><code>0.0</code></td><td>Risk-free rate for Sharpe/Sortino calculation</td></tr>
+      <tr><td><code>periods_per_year</code></td><td><code>252</code></td><td>Trading days per year for annualization</td></tr>
     </table>
 
     <!-- ────── SCORING ────── -->
     <h2 id="scoring">Scoring</h2>
     <p>Build composite scores from enriched feature data.</p>
-    <pre><span class="kw">from</span> cobweb_py <span class="kw">import</span> score_by_id, auto_score
+    <pre><span class="kw">from</span> cobweb_py <span class="kw">import</span> score_by_id, score, auto_score, auto_score_by_id
 
-<span class="cm"># Weighted score by feature IDs</span>
+<span class="cm"># Weighted score by feature IDs (most common)</span>
 scores = <span class="fn">score_by_id</span>(enriched_rows, {<span class="num">36</span>: <span class="num">0.3</span>, <span class="num">11</span>: <span class="num">0.3</span>, <span class="num">1</span>: <span class="num">0.4</span>})
 
-<span class="cm"># Or use the default formula (RSI + SMA signal + returns)</span>
-scores = <span class="fn">auto_score</span>(enriched_rows)</pre>
+<span class="cm"># Weighted score by column names</span>
+scores = <span class="fn">score</span>(enriched_rows, {<span class="str">"rsi_14"</span>: <span class="num">0.3</span>, <span class="str">"sma_signal"</span>: <span class="num">0.3</span>, <span class="str">"ret_1d"</span>: <span class="num">0.4</span>})
+
+<span class="cm"># Default formula (RSI + SMA signal + returns)</span>
+scores = <span class="fn">auto_score</span>(enriched_rows)       <span class="cm"># by column names</span>
+scores = <span class="fn">auto_score_by_id</span>(enriched_rows)  <span class="cm"># by feature IDs</span></pre>
     <p>MA features (IDs 10-15) are auto-converted to <code>(Close - MA) / MA</code> signal form. RSI is scaled to 0-1. Other features are z-scored.</p>
+
+    <h3>Feature / Plot Discovery</h3>
+    <pre><span class="kw">from</span> cobweb_py <span class="kw">import</span> show_features, show_plots, show_categories
+<span class="kw">from</span> cobweb_py <span class="kw">import</span> list_features, list_plots
+
+<span class="fn">show_features</span>()              <span class="cm"># print all 71 features</span>
+<span class="fn">show_features</span>(<span class="str">"rsi"</span>)         <span class="cm"># filter by category (fuzzy match)</span>
+<span class="fn">show_plots</span>(<span class="str">"trades"</span>)         <span class="cm"># filter plots by category</span>
+<span class="fn">show_categories</span>()            <span class="cm"># list all valid category names</span>
+
+<span class="cm"># Programmatic access (returns list of dicts):</span>
+feats = <span class="fn">list_features</span>(<span class="str">"vol"</span>)  <span class="cm"># [{"id": 38, "name": "vol_20", "category": "volatility"}, ...]</span>
+plots = <span class="fn">list_plots</span>()           <span class="cm"># all 27 plots</span></pre>
 
     <!-- ────── SIGNALS ────── -->
     <h2 id="signals">Signals</h2>
@@ -190,7 +213,10 @@ signals = <span class="fn">to_signals</span>(scores, entry_th=<span class="num">
     <p>Enrich once, iterate many times with different weights and parameters.</p>
     <pre><span class="kw">from</span> cobweb_py <span class="kw">import</span> Pipeline
 
-pipe = <span class="fn">Pipeline</span>(<span class="str">"https://web-production-83f3e.up.railway.app"</span>, <span class="str">"stock.csv"</span>)
+pipe = <span class="fn">Pipeline</span>(<span class="str">"https://web-production-83f3e.up.railway.app"</span>, <span class="str">"stock.csv"</span>,
+    benchmark=<span class="str">"spy.csv"</span>,         <span class="cm"># optional benchmark data</span>
+    feature_ids=<span class="fn">list</span>(<span class="fn">range</span>(<span class="num">1</span>, <span class="num">72</span>)),  <span class="cm"># default: all 71</span>
+)
 result = pipe.<span class="fn">run</span>(weights={<span class="num">36</span>: <span class="num">0.3</span>, <span class="num">11</span>: <span class="num">0.3</span>, <span class="num">1</span>: <span class="num">0.4</span>})
 
 <span class="cm"># Re-run with different params (no re-enrichment):</span>
@@ -198,11 +224,18 @@ result2 = pipe.<span class="fn">run</span>(weights={<span class="num">36</span>:
 
 <span class="cm"># Access Plotly figures:</span>
 <span class="kw">for</span> name, fig <span class="kw">in</span> result[<span class="str">"figures"</span>].items():
-    fig.<span class="fn">show</span>()</pre>
+    fig.<span class="fn">show</span>()
+
+<span class="cm"># Result keys: metrics, signal, trades, scores, signals, equity_curve, backtest, figures</span></pre>
 
     <!-- ────── PLOTS SDK ────── -->
     <h2 id="plots-sdk">Plots (SDK)</h2>
-    <p>HTML-generating convenience functions:</p>
+    <p>HTML-generating convenience functions. Import from <code>cobweb_py.plots</code>:</p>
+    <pre><span class="kw">from</span> cobweb_py.plots <span class="kw">import</span> (
+    save_equity_plot, save_metrics_table, save_trades_table,
+    save_score_plot, save_price_and_score_plot, save_features_table,
+    save_api_payloads_to_html, payloads_to_figures,
+)</pre>
     <table>
       <tr><th>Function</th><th>Output</th></tr>
       <tr><td><code>save_equity_plot(bt)</code></td><td>Equity curve + position units</td></tr>
@@ -214,10 +247,15 @@ result2 = pipe.<span class="fn">run</span>(weights={<span class="num">36</span>:
       <tr><td><code>save_api_payloads_to_html(payloads)</code></td><td>Any API plot &rarr; HTML file</td></tr>
       <tr><td><code>payloads_to_figures(payloads)</code></td><td>API plots &rarr; Plotly figures</td></tr>
     </table>
+    <p><code>payload_to_figure</code> and <code>payloads_to_figures</code> are also available as top-level imports: <code>from cobweb_py import payloads_to_figures</code>.</p>
 
     <!-- ────── UTILITIES ────── -->
     <h2 id="utilities">Utilities</h2>
-    <pre><span class="kw">from</span> cobweb_py <span class="kw">import</span> fix_timestamps, load_csv, align, print_signal, get_signal
+    <pre><span class="kw">from</span> cobweb_py <span class="kw">import</span> (
+    fix_timestamps, load_csv, align, to_signals,
+    print_signal, get_signal, save_table,
+    get_plot, save_all_plots,
+)
 
 <span class="cm"># Normalize timestamps for the API</span>
 data = <span class="fn">fix_timestamps</span>(rows, dayfirst=<span class="kw">True</span>)
@@ -230,7 +268,17 @@ asset, bench = <span class="fn">align</span>(asset_data, benchmark_data)
 
 <span class="cm"># Get current signal from backtest</span>
 <span class="fn">print_signal</span>(bt)   <span class="cm"># Signal: BUY   |  exposure=+0.87  |  strength=0.72</span>
-s = <span class="fn">get_signal</span>(bt)  <span class="cm"># {"signal": "buy", "exposure": 0.87, "strength": 0.72}</span></pre>
+s = <span class="fn">get_signal</span>(bt)  <span class="cm"># {"signal": "buy", "exposure": 0.87, "strength": 0.72}</span>
+
+<span class="cm"># Save a lightweight HTML table</span>
+<span class="fn">save_table</span>(rows, <span class="str">"out.html"</span>, title=<span class="str">"My Table"</span>)
+
+<span class="cm"># Fetch a single plot (auto-handles benchmark/regime/correlation deps)</span>
+pl = <span class="fn">get_plot</span>(sim, data, bt, <span class="num">5</span>)              <span class="cm"># by ID</span>
+pl = <span class="fn">get_plot</span>(sim, data, bt, <span class="str">"sharpe"</span>)       <span class="cm"># by fuzzy name</span>
+
+<span class="cm"># Fetch and save all plots as HTML</span>
+<span class="fn">save_all_plots</span>(sim, data, bt, <span class="fn">range</span>(<span class="num">1</span>, <span class="num">28</span>), out_dir=<span class="str">"out/plots"</span>)</pre>
 
     <!-- ────── API OVERVIEW ────── -->
     <h2 id="api-overview">API Overview</h2>
