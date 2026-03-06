@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your First Backtest in 30 Lines &mdash; cobweb.market</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="../index.html" class="logo">cobweb<span>.market</span></a>
+    <ul class="nav-links">
+      <li><a href="../docs.html">Docs</a></li>
+      <li><a href="../blog.html" class="active">Blog</a></li>
+      <li><a href="https://web-production-83f3e.up.railway.app/docs" target="_blank">API</a></li>
+      <li><a href="https://github.com/cobwebSim/StockSim-" target="_blank">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<article class="blog-post">
+
+  <h1>Your First Backtest in 30 Lines of Python</h1>
+  <p class="meta">2025-03-06</p>
+
+  <p>Most backtesting tutorials skip the hard part: realistic transaction costs. You build a strategy that looks great on paper, then watch it bleed money in production because spread, slippage, and market impact weren't modeled.</p>
+
+  <p>cobweb-py gives you a full execution simulator behind a simple API. In this post, we'll go from zero to a friction-aware backtest in about 30 lines.</p>
+
+  <h2>Prerequisites</h2>
+  <pre>pip install cobweb-py yfinance plotly</pre>
+  <p>That's it. No API key required&mdash;the free tier is open.</p>
+
+  <h2>Step 1: Get the Data</h2>
+  <p>We'll use yfinance to grab 5 years of SPY daily bars, then normalize timestamps for the API.</p>
+  <pre><span class="kw">import</span> yfinance <span class="kw">as</span> yf
+<span class="kw">from</span> cobweb_py <span class="kw">import</span> CobwebSim, BacktestConfig, fix_timestamps, print_signal
+<span class="kw">from</span> cobweb_py.plots <span class="kw">import</span> save_equity_plot, save_metrics_table
+
+df = yf.<span class="fn">download</span>(<span class="str">"SPY"</span>, start=<span class="str">"2020-01-01"</span>, end=<span class="str">"2024-12-31"</span>)
+df.columns = df.columns.<span class="fn">get_level_values</span>(<span class="num">0</span>)  <span class="cm"># flatten MultiIndex (yfinance quirk)</span>
+df = df.<span class="fn">reset_index</span>().<span class="fn">rename</span>(columns={<span class="str">"Date"</span>: <span class="str">"timestamp"</span>})
+rows = df[[<span class="str">"timestamp"</span>,<span class="str">"Open"</span>,<span class="str">"High"</span>,<span class="str">"Low"</span>,<span class="str">"Close"</span>,<span class="str">"Volume"</span>]].<span class="fn">to_dict</span>(<span class="str">"records"</span>)
+data = <span class="fn">fix_timestamps</span>(rows)</pre>
+
+  <p><code>fix_timestamps()</code> normalizes any date format (including DD/MM/YYYY) into the ISO format the API expects. It also drops bad rows and sorts chronologically.</p>
+
+  <h2>Step 2: Build a Signal</h2>
+  <p>We'll use a classic momentum rule: go long when the close is above the 50-day simple moving average, stay flat otherwise.</p>
+  <pre>close = df[<span class="str">"Close"</span>].values
+sma50 = df[<span class="str">"Close"</span>].<span class="fn">rolling</span>(<span class="num">50</span>).<span class="fn">mean</span>().values
+signals = [<span class="num">1.0</span> <span class="kw">if</span> c &gt; s <span class="kw">else</span> <span class="num">0.0</span> <span class="kw">for</span> c, s <span class="kw">in</span> <span class="fn">zip</span>(close, sma50)]
+signals[:<span class="num">50</span>] = [<span class="num">0.0</span>] * <span class="num">50</span>  <span class="cm"># flat during warmup</span></pre>
+
+  <p>Signals are just a list of floats: <code>1.0</code> = fully long, <code>0.0</code> = flat, <code>-1.0</code> = fully short. One value per bar, same length as your data.</p>
+
+  <h2>Step 3: Run the Backtest</h2>
+  <pre>sim = <span class="fn">CobwebSim</span>(<span class="str">"https://web-production-83f3e.up.railway.app"</span>)
+
+bt = sim.<span class="fn">backtest</span>(
+    data,
+    signals=signals,
+    config=<span class="fn">BacktestConfig</span>(exec_horizon=<span class="str">"swing"</span>, initial_cash=<span class="num">100_000</span>),
+)</pre>
+
+  <p>Behind the scenes, every trade goes through the execution simulator:</p>
+  <ul>
+    <li>Signals are shifted by 1 bar (signal at close, trade at next open)</li>
+    <li>Fills include half-spread, base slippage, and sqrt market impact</li>
+    <li>Each fill is capped at 8% of bar volume (swing preset)</li>
+    <li>Unfilled quantity carries forward as a pending order</li>
+  </ul>
+
+  <h2>Step 4: Check Results</h2>
+  <pre><span class="fn">print</span>(f<span class="str">"Return:  {bt['metrics']['total_return']:.2%}"</span>)
+<span class="fn">print</span>(f<span class="str">"Sharpe:  {bt['metrics']['sharpe_ann']:.2f}"</span>)
+<span class="fn">print</span>(f<span class="str">"Max DD:  {bt['metrics']['max_drawdown']:.2%}"</span>)
+<span class="fn">print</span>(f<span class="str">"Trades:  {bt['metrics']['trades']}"</span>)
+<span class="fn">print_signal</span>(bt)</pre>
+
+  <h2>Step 5: Save Charts</h2>
+  <pre><span class="fn">save_equity_plot</span>(bt, out_html=<span class="str">"equity.html"</span>)
+<span class="fn">save_metrics_table</span>(bt, out_html=<span class="str">"metrics.html"</span>)
+<span class="fn">print</span>(<span class="str">"Done &mdash; open equity.html in your browser."</span>)</pre>
+
+  <p>You'll get an interactive Plotly chart showing the equity curve and position sizes over time, plus a styled metrics table with Sharpe, Sortino, max drawdown, VaR, and the current signal.</p>
+
+  <h2>Full Code</h2>
+  <p>Here's everything in one block you can copy-paste:</p>
+  <pre><span class="kw">import</span> yfinance <span class="kw">as</span> yf
+<span class="kw">from</span> cobweb_py <span class="kw">import</span> CobwebSim, BacktestConfig, fix_timestamps, print_signal
+<span class="kw">from</span> cobweb_py.plots <span class="kw">import</span> save_equity_plot, save_metrics_table
+
+<span class="cm"># 1. Grab SPY data</span>
+df = yf.<span class="fn">download</span>(<span class="str">"SPY"</span>, start=<span class="str">"2020-01-01"</span>, end=<span class="str">"2024-12-31"</span>)
+df.columns = df.columns.<span class="fn">get_level_values</span>(<span class="num">0</span>)
+df = df.<span class="fn">reset_index</span>().<span class="fn">rename</span>(columns={<span class="str">"Date"</span>: <span class="str">"timestamp"</span>})
+rows = df[[<span class="str">"timestamp"</span>,<span class="str">"Open"</span>,<span class="str">"High"</span>,<span class="str">"Low"</span>,<span class="str">"Close"</span>,<span class="str">"Volume"</span>]].<span class="fn">to_dict</span>(<span class="str">"records"</span>)
+data = <span class="fn">fix_timestamps</span>(rows)
+
+<span class="cm"># 2. Connect (free, no key needed)</span>
+sim = <span class="fn">CobwebSim</span>(<span class="str">"https://web-production-83f3e.up.railway.app"</span>)
+
+<span class="cm"># 3. Simple momentum: long when price &gt; 50-day SMA</span>
+close = df[<span class="str">"Close"</span>].values
+sma50 = df[<span class="str">"Close"</span>].<span class="fn">rolling</span>(<span class="num">50</span>).<span class="fn">mean</span>().values
+signals = [<span class="num">1.0</span> <span class="kw">if</span> c &gt; s <span class="kw">else</span> <span class="num">0.0</span> <span class="kw">for</span> c, s <span class="kw">in</span> <span class="fn">zip</span>(close, sma50)]
+signals[:<span class="num">50</span>] = [<span class="num">0.0</span>] * <span class="num">50</span>
+
+<span class="cm"># 4. Backtest with realistic friction</span>
+bt = sim.<span class="fn">backtest</span>(data, signals=signals,
+    config=<span class="fn">BacktestConfig</span>(exec_horizon=<span class="str">"swing"</span>, initial_cash=<span class="num">100_000</span>))
+
+<span class="cm"># 5. Results</span>
+<span class="fn">print</span>(f<span class="str">"Return:  {bt['metrics']['total_return']:.2%}"</span>)
+<span class="fn">print</span>(f<span class="str">"Sharpe:  {bt['metrics']['sharpe_ann']:.2f}"</span>)
+<span class="fn">print</span>(f<span class="str">"Max DD:  {bt['metrics']['max_drawdown']:.2%}"</span>)
+<span class="fn">print</span>(f<span class="str">"Trades:  {bt['metrics']['trades']}"</span>)
+<span class="fn">print_signal</span>(bt)
+<span class="fn">save_equity_plot</span>(bt, out_html=<span class="str">"equity.html"</span>)
+<span class="fn">save_metrics_table</span>(bt, out_html=<span class="str">"metrics.html"</span>)</pre>
+
+  <h2>What's Next</h2>
+  <ul>
+    <li>Try different tickers: <code>"AAPL"</code>, <code>"QQQ"</code>, <code>"BTC-USD"</code></li>
+    <li>Use the <a href="../docs.html#scoring">scoring engine</a> to build composite signals from RSI, MACD, and Bollinger features</li>
+    <li>Add a benchmark with <code>benchmark=</code> to get rolling alpha/beta plots</li>
+    <li>Use the <a href="../docs.html#pipeline">Pipeline class</a> to iterate on weights without re-fetching data</li>
+    <li>Explore all <a href="../docs.html#plots-table">27 plot types</a> for deeper analysis</li>
+  </ul>
+
+  <p><a href="../blog.html">&larr; Back to blog</a></p>
+
+</article>
+
+<footer>
+  <p>cobweb.market &copy; 2025 &middot; <a href="https://github.com/cobwebSim/StockSim-">GitHub</a> &middot; <a href="https://web-production-83f3e.up.railway.app/docs">API</a> &middot; <a href="../docs.html">Docs</a></p>
+</footer>
+
+</body>
+</html>

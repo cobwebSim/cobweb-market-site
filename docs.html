@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Docs &mdash; cobweb.market</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="index.html" class="logo">cobweb<span>.market</span></a>
+    <ul class="nav-links">
+      <li><a href="docs.html" class="active">Docs</a></li>
+      <li><a href="blog.html">Blog</a></li>
+      <li><a href="https://web-production-83f3e.up.railway.app/docs" target="_blank">API</a></li>
+      <li><a href="https://github.com/cobwebSim/StockSim-" target="_blank">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="docs-layout">
+
+  <!-- Sidebar -->
+  <aside class="docs-sidebar">
+    <div class="sidebar-heading">Getting Started</div>
+    <ul>
+      <li><a href="#quickstart">Quickstart</a></li>
+      <li><a href="#installation">Installation</a></li>
+    </ul>
+    <div class="sidebar-heading">SDK</div>
+    <ul>
+      <li><a href="#client">CobwebSim Client</a></li>
+      <li><a href="#backtest-config">BacktestConfig</a></li>
+      <li><a href="#scoring">Scoring</a></li>
+      <li><a href="#signals">Signals</a></li>
+      <li><a href="#pipeline">Pipeline</a></li>
+      <li><a href="#plots-sdk">Plots (SDK)</a></li>
+      <li><a href="#utilities">Utilities</a></li>
+    </ul>
+    <div class="sidebar-heading">API</div>
+    <ul>
+      <li><a href="#api-overview">Overview</a></li>
+      <li><a href="#api-features">POST /features</a></li>
+      <li><a href="#api-backtest">POST /backtest</a></li>
+      <li><a href="#api-plots">POST /plots</a></li>
+    </ul>
+    <div class="sidebar-heading">Reference</div>
+    <ul>
+      <li><a href="#features-table">71 Features</a></li>
+      <li><a href="#plots-table">27 Plots</a></li>
+      <li><a href="#execution-model">Execution Model</a></li>
+    </ul>
+  </aside>
+
+  <!-- Content -->
+  <main class="docs-content">
+
+    <!-- ────── QUICKSTART ────── -->
+    <h2 id="quickstart">Quickstart</h2>
+    <p>Get a full backtest running in under 30 lines. No API key required.</p>
+
+    <pre><span class="cm"># pip install cobweb-py yfinance plotly</span>
+
+<span class="kw">import</span> yfinance <span class="kw">as</span> yf
+<span class="kw">from</span> cobweb_py <span class="kw">import</span> CobwebSim, BacktestConfig, fix_timestamps, print_signal
+<span class="kw">from</span> cobweb_py.plots <span class="kw">import</span> save_equity_plot, save_metrics_table
+
+<span class="cm"># 1. Grab SPY data</span>
+df = yf.<span class="fn">download</span>(<span class="str">"SPY"</span>, start=<span class="str">"2020-01-01"</span>, end=<span class="str">"2024-12-31"</span>)
+df.columns = df.columns.<span class="fn">get_level_values</span>(<span class="num">0</span>)
+df = df.<span class="fn">reset_index</span>().<span class="fn">rename</span>(columns={<span class="str">"Date"</span>: <span class="str">"timestamp"</span>})
+rows = df[[<span class="str">"timestamp"</span>,<span class="str">"Open"</span>,<span class="str">"High"</span>,<span class="str">"Low"</span>,<span class="str">"Close"</span>,<span class="str">"Volume"</span>]].<span class="fn">to_dict</span>(<span class="str">"records"</span>)
+data = <span class="fn">fix_timestamps</span>(rows)
+
+<span class="cm"># 2. Connect (free, no key needed)</span>
+sim = <span class="fn">CobwebSim</span>(<span class="str">"https://web-production-83f3e.up.railway.app"</span>)
+
+<span class="cm"># 3. Simple momentum: long when price &gt; 50-day SMA</span>
+close = df[<span class="str">"Close"</span>].values
+sma50 = df[<span class="str">"Close"</span>].<span class="fn">rolling</span>(<span class="num">50</span>).<span class="fn">mean</span>().values
+signals = [<span class="num">1.0</span> <span class="kw">if</span> c &gt; s <span class="kw">else</span> <span class="num">0.0</span> <span class="kw">for</span> c, s <span class="kw">in</span> <span class="fn">zip</span>(close, sma50)]
+signals[:<span class="num">50</span>] = [<span class="num">0.0</span>] * <span class="num">50</span>
+
+<span class="cm"># 4. Backtest with realistic friction</span>
+bt = sim.<span class="fn">backtest</span>(data, signals=signals,
+    config=<span class="fn">BacktestConfig</span>(exec_horizon=<span class="str">"swing"</span>, initial_cash=<span class="num">100_000</span>))
+
+<span class="cm"># 5. Results</span>
+<span class="fn">print</span>(f<span class="str">"Return: {bt['metrics']['total_return']:.2%}"</span>)
+<span class="fn">print</span>(f<span class="str">"Sharpe: {bt['metrics']['sharpe_ann']:.2f}"</span>)
+<span class="fn">print_signal</span>(bt)
+<span class="fn">save_equity_plot</span>(bt, out_html=<span class="str">"equity.html"</span>)
+<span class="fn">save_metrics_table</span>(bt, out_html=<span class="str">"metrics.html"</span>)</pre>
+
+    <!-- ────── INSTALLATION ────── -->
+    <h2 id="installation">Installation</h2>
+    <pre><span class="cm"># Base SDK (API calls only)</span>
+pip install cobweb-py
+
+<span class="cm"># With visualization (adds pandas + plotly)</span>
+pip install cobweb-py[viz]</pre>
+    <p>Requires <strong>Python 3.9+</strong>.</p>
+
+    <!-- ────── CLIENT ────── -->
+    <h2 id="client">CobwebSim Client</h2>
+    <p>The main class for interacting with the API.</p>
+    <pre>sim = <span class="fn">CobwebSim</span>(
+    base_url=<span class="str">"https://web-production-83f3e.up.railway.app"</span>,
+    api_key=<span class="str">"YOUR_KEY"</span>,   <span class="cm"># optional if auth is disabled</span>
+    timeout=<span class="num">60</span>,
+)</pre>
+
+    <h3>sim.health()</h3>
+    <p>Check API status. Returns <code>{"status": "ok", "version": "0.1.0"}</code>.</p>
+
+    <h3>sim.enrich(data, feature_ids)</h3>
+    <p>Compute technical features from OHLCV data. Returns rows with feature columns appended.</p>
+    <pre>feats = sim.<span class="fn">enrich</span>(<span class="str">"stock.csv"</span>, feature_ids=[<span class="num">1</span>, <span class="num">11</span>, <span class="num">36</span>])
+rows = feats[<span class="str">"rows"</span>]              <span class="cm"># OHLCV + ret_1d, sma_20, rsi_14</span>
+cols = feats[<span class="str">"feature_columns"</span>]   <span class="cm"># ['ret_1d', 'sma_20', 'rsi_14']</span></pre>
+    <p>Accepts: CSV path, pandas DataFrame, <code>list[dict]</code>, or <code>{"rows": [...]}</code>.</p>
+
+    <h3>sim.backtest(data, signals=, config=)</h3>
+    <p>Run a full backtest with execution modeling.</p>
+    <pre>bt = sim.<span class="fn">backtest</span>(
+    data,
+    signals=[<span class="num">0.0</span>]*<span class="num">50</span> + [<span class="num">1.0</span>]*<span class="num">200</span>,   <span class="cm"># or "long" / "short" / "flat"</span>
+    config=<span class="fn">BacktestConfig</span>(exec_horizon=<span class="str">"swing"</span>),
+    compute_features=<span class="kw">True</span>,
+    feature_ids=[<span class="num">70</span>, <span class="num">71</span>],
+    benchmark=benchmark_data,         <span class="cm"># optional</span>
+)
+
+bt[<span class="str">"metrics"</span>]        <span class="cm"># Sharpe, Sortino, drawdown, VaR, ...</span>
+bt[<span class="str">"trades"</span>]         <span class="cm"># fill prices, costs, TCA breakdown</span>
+bt[<span class="str">"equity_curve"</span>]   <span class="cm"># per-bar equity, cash, position</span>
+bt[<span class="str">"current_signal"</span>] <span class="cm"># "buy" / "sell" / "hold"</span></pre>
+
+    <h3>sim.plots(data, backtest_result, plot_ids=)</h3>
+    <p>Generate chart payloads from backtest results.</p>
+    <pre>pl = sim.<span class="fn">plots</span>(data, bt, plot_ids=[<span class="num">1</span>, <span class="num">5</span>, <span class="num">10</span>])
+pl[<span class="str">"payloads"</span>]  <span class="cm"># dict of plot data keyed by name</span></pre>
+
+    <!-- ────── BACKTEST CONFIG ────── -->
+    <h2 id="backtest-config">BacktestConfig</h2>
+    <p>All fields are optional with sensible defaults.</p>
+    <table>
+      <tr><th>Parameter</th><th>Default</th><th>Description</th></tr>
+      <tr><td><code>initial_cash</code></td><td><code>10,000</code></td><td>Starting capital</td></tr>
+      <tr><td><code>exec_horizon</code></td><td><code>"swing"</code></td><td><code>intraday</code> | <code>swing</code> | <code>longterm</code></td></tr>
+      <tr><td><code>asset_type</code></td><td><code>"equities"</code></td><td><code>equities</code> | <code>crypto</code></td></tr>
+      <tr><td><code>fee_bps</code></td><td><code>1.0</code></td><td>Broker fee (basis points)</td></tr>
+      <tr><td><code>half_spread_bps</code></td><td><code>2.0</code></td><td>Bid-ask half-spread</td></tr>
+      <tr><td><code>base_slippage_bps</code></td><td><code>1.0</code></td><td>Fixed slippage component</td></tr>
+      <tr><td><code>impact_coeff</code></td><td><code>1.0</code></td><td>Market impact multiplier</td></tr>
+      <tr><td><code>max_leverage</code></td><td><code>1.0</code></td><td>Maximum leverage allowed</td></tr>
+      <tr><td><code>allow_margin</code></td><td><code>false</code></td><td>Allow margin/short positions</td></tr>
+      <tr><td><code>rebalance_mode</code></td><td><code>"on_signal_change"</code></td><td><code>on_signal_change</code> | <code>every_bar</code> | <code>calendar</code></td></tr>
+      <tr><td><code>buy_threshold</code></td><td><code>0.10</code></td><td>Exposure threshold to trigger buy</td></tr>
+      <tr><td><code>sell_threshold</code></td><td><code>-0.10</code></td><td>Exposure threshold to trigger sell</td></tr>
+    </table>
+
+    <!-- ────── SCORING ────── -->
+    <h2 id="scoring">Scoring</h2>
+    <p>Build composite scores from enriched feature data.</p>
+    <pre><span class="kw">from</span> cobweb_py <span class="kw">import</span> score_by_id, auto_score
+
+<span class="cm"># Weighted score by feature IDs</span>
+scores = <span class="fn">score_by_id</span>(enriched_rows, {<span class="num">36</span>: <span class="num">0.3</span>, <span class="num">11</span>: <span class="num">0.3</span>, <span class="num">1</span>: <span class="num">0.4</span>})
+
+<span class="cm"># Or use the default formula (RSI + SMA signal + returns)</span>
+scores = <span class="fn">auto_score</span>(enriched_rows)</pre>
+    <p>MA features (IDs 10-15) are auto-converted to <code>(Close - MA) / MA</code> signal form. RSI is scaled to 0-1. Other features are z-scored.</p>
+
+    <!-- ────── SIGNALS ────── -->
+    <h2 id="signals">Signals</h2>
+    <p>Convert scores into discrete trading positions.</p>
+    <pre><span class="kw">from</span> cobweb_py <span class="kw">import</span> to_signals
+
+signals = <span class="fn">to_signals</span>(scores, entry_th=<span class="num">0.20</span>, exit_th=<span class="num">0.05</span>, use_shorts=<span class="kw">False</span>)
+<span class="cm"># Returns: list of 0.0 (flat) and 1.0 (long)</span>
+<span class="cm"># With use_shorts=True: -1.0 (short), 0.0, 1.0</span></pre>
+
+    <!-- ────── PIPELINE ────── -->
+    <h2 id="pipeline">Pipeline</h2>
+    <p>Enrich once, iterate many times with different weights and parameters.</p>
+    <pre><span class="kw">from</span> cobweb_py <span class="kw">import</span> Pipeline
+
+pipe = <span class="fn">Pipeline</span>(<span class="str">"https://web-production-83f3e.up.railway.app"</span>, <span class="str">"stock.csv"</span>)
+result = pipe.<span class="fn">run</span>(weights={<span class="num">36</span>: <span class="num">0.3</span>, <span class="num">11</span>: <span class="num">0.3</span>, <span class="num">1</span>: <span class="num">0.4</span>})
+
+<span class="cm"># Re-run with different params (no re-enrichment):</span>
+result2 = pipe.<span class="fn">run</span>(weights={<span class="num">36</span>: <span class="num">0.5</span>, <span class="num">1</span>: <span class="num">0.5</span>}, entry_th=<span class="num">0.30</span>)
+
+<span class="cm"># Access Plotly figures:</span>
+<span class="kw">for</span> name, fig <span class="kw">in</span> result[<span class="str">"figures"</span>].items():
+    fig.<span class="fn">show</span>()</pre>
+
+    <!-- ────── PLOTS SDK ────── -->
+    <h2 id="plots-sdk">Plots (SDK)</h2>
+    <p>HTML-generating convenience functions:</p>
+    <table>
+      <tr><th>Function</th><th>Output</th></tr>
+      <tr><td><code>save_equity_plot(bt)</code></td><td>Equity curve + position units</td></tr>
+      <tr><td><code>save_metrics_table(bt)</code></td><td>Styled metrics summary</td></tr>
+      <tr><td><code>save_trades_table(bt)</code></td><td>Trade log with TCA breakdown</td></tr>
+      <tr><td><code>save_score_plot(rows, scores)</code></td><td>Score time series</td></tr>
+      <tr><td><code>save_price_and_score_plot(rows, scores)</code></td><td>Price + score overlay</td></tr>
+      <tr><td><code>save_features_table(rows)</code></td><td>OHLCV + features (HTML + CSV)</td></tr>
+      <tr><td><code>save_api_payloads_to_html(payloads)</code></td><td>Any API plot &rarr; HTML file</td></tr>
+      <tr><td><code>payloads_to_figures(payloads)</code></td><td>API plots &rarr; Plotly figures</td></tr>
+    </table>
+
+    <!-- ────── UTILITIES ────── -->
+    <h2 id="utilities">Utilities</h2>
+    <pre><span class="kw">from</span> cobweb_py <span class="kw">import</span> fix_timestamps, load_csv, align, print_signal, get_signal
+
+<span class="cm"># Normalize timestamps for the API</span>
+data = <span class="fn">fix_timestamps</span>(rows, dayfirst=<span class="kw">True</span>)
+
+<span class="cm"># Load CSV with auto-detection</span>
+data = <span class="fn">load_csv</span>(<span class="str">"stock.csv"</span>)
+
+<span class="cm"># Align two datasets by timestamp</span>
+asset, bench = <span class="fn">align</span>(asset_data, benchmark_data)
+
+<span class="cm"># Get current signal from backtest</span>
+<span class="fn">print_signal</span>(bt)   <span class="cm"># Signal: BUY   |  exposure=+0.87  |  strength=0.72</span>
+s = <span class="fn">get_signal</span>(bt)  <span class="cm"># {"signal": "buy", "exposure": 0.87, "strength": 0.72}</span></pre>
+
+    <!-- ────── API OVERVIEW ────── -->
+    <h2 id="api-overview">API Overview</h2>
+    <p>Base URL: <code>https://web-production-83f3e.up.railway.app</code></p>
+    <p>All endpoints accept JSON. No API key required (free tier).</p>
+    <table>
+      <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+      <tr><td><code>GET</code></td><td><code>/health</code></td><td>Health check</td></tr>
+      <tr><td><code>POST</code></td><td><code>/features</code></td><td>Compute features from OHLCV</td></tr>
+      <tr><td><code>POST</code></td><td><code>/backtest</code></td><td>Run backtest simulation</td></tr>
+      <tr><td><code>POST</code></td><td><code>/plots</code></td><td>Generate chart payloads</td></tr>
+    </table>
+    <p>Full interactive docs: <a href="https://web-production-83f3e.up.railway.app/docs" target="_blank">Swagger UI</a></p>
+
+    <!-- ────── API /features ────── -->
+    <h2 id="api-features">POST /features</h2>
+    <p>Compute technical features from OHLCV candle data (minimum 20 rows).</p>
+    <pre><span class="cm"># curl example</span>
+curl -X POST https://web-production-83f3e.up.railway.app/features \
+  -H "Content-Type: application/json" \
+  -d '{
+    "data": {"rows": [{"open":150,"high":155,"low":149,"close":153,"volume":1000000}, ...]},
+    "feature_ids": [1, 11, 36]
+  }'</pre>
+
+    <!-- ────── API /backtest ────── -->
+    <h2 id="api-backtest">POST /backtest</h2>
+    <p>Run a backtest with signals and execution modeling. Signal count must match row count.</p>
+    <pre>curl -X POST https://web-production-83f3e.up.railway.app/backtest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "data": {"rows": [...]},
+    "signals": [0, 0, 1, 1, 1, 0, -1, ...],
+    "config": {"exec_horizon": "swing", "initial_cash": 100000}
+  }'</pre>
+
+    <!-- ────── API /plots ────── -->
+    <h2 id="api-plots">POST /plots</h2>
+    <p>Generate chart payloads from OHLCV data and a backtest result.</p>
+    <pre>curl -X POST https://web-production-83f3e.up.railway.app/plots \
+  -H "Content-Type: application/json" \
+  -d '{
+    "data": {"rows": [...]},
+    "backtest_result": { ...bt response... },
+    "plot_ids": [1, 5, 10]
+  }'</pre>
+
+    <!-- ────── FEATURES TABLE ────── -->
+    <h2 id="features-table">71 Features</h2>
+    <table>
+      <tr><th>IDs</th><th>Category</th><th>Examples</th></tr>
+      <tr><td>1&ndash;9</td><td>Returns / Momentum</td><td>ret_1d, logret_1d, ret_5d, ret_20d, ret_60d, ret_252d, acceleration, percentile</td></tr>
+      <tr><td>10&ndash;29</td><td>Trend / Moving Averages</td><td>sma_10/20/50/200, ema_12/26, slopes, distances, spreads</td></tr>
+      <tr><td>30&ndash;35</td><td>MACD</td><td>macd, signal, histogram, slopes, z-score</td></tr>
+      <tr><td>36&ndash;37</td><td>RSI</td><td>rsi_14, rsi_pct_252</td></tr>
+      <tr><td>38&ndash;44</td><td>Volatility / ATR</td><td>vol_20, vol_60, atr_14, vol-of-vol, percentiles</td></tr>
+      <tr><td>45&ndash;51</td><td>Bollinger Bands</td><td>mid/upper/lower, bandwidth, %B, distances</td></tr>
+      <tr><td>52&ndash;54</td><td>Mean Reversion</td><td>zscore_20, deviation from mean</td></tr>
+      <tr><td>55&ndash;56</td><td>Stochastic</td><td>%K and %D (14-period)</td></tr>
+      <tr><td>57&ndash;62</td><td>Volume / Range</td><td>adv_20, vol_shock, vol_z, range ratio</td></tr>
+      <tr><td>63&ndash;67</td><td>Risk</td><td>drawdown, skew, kurtosis</td></tr>
+      <tr><td>68&ndash;69</td><td>Beta / Correlation</td><td>beta_252, corr_252</td></tr>
+      <tr><td>70&ndash;71</td><td>Regime</td><td>trend_regime, vol_regime</td></tr>
+    </table>
+    <p>Full list in code: <code>from cobweb_py import show_features; show_features()</code></p>
+
+    <!-- ────── PLOTS TABLE ────── -->
+    <h2 id="plots-table">27 Plots</h2>
+    <table>
+      <tr><th>IDs</th><th>Category</th><th>Plots</th></tr>
+      <tr><td>1&ndash;15</td><td>Performance</td><td>Equity (linear/log), vs benchmark, daily returns, rolling Sharpe/Sortino/vol/beta/alpha, drawdowns, VaR/CVaR, tail risk</td></tr>
+      <tr><td>16&ndash;19</td><td>Trades</td><td>Return distribution, win/loss overlay, expectancy, duration vs return</td></tr>
+      <tr><td>20&ndash;22</td><td>Regime</td><td>Performance by vol regime, trend regime, bull vs bear</td></tr>
+      <tr><td>23</td><td>Diagnostics</td><td>Feature correlation heatmap</td></tr>
+      <tr><td>24&ndash;27</td><td>Volume / Execution</td><td>Volume, volume shock, participation, transaction costs</td></tr>
+    </table>
+
+    <!-- ────── EXECUTION MODEL ────── -->
+    <h2 id="execution-model">Execution Model</h2>
+    <p>Every trade passes through a realistic execution simulator:</p>
+    <ul>
+      <li><strong>Half-spread</strong> &mdash; bid-ask crossing cost (taker)</li>
+      <li><strong>Base slippage</strong> &mdash; fixed bps component</li>
+      <li><strong>Market impact</strong> &mdash; <code>impact_coeff &times; vol_bps &times; &radic;participation</code></li>
+      <li><strong>Broker fee</strong> &mdash; flat bps on notional</li>
+      <li><strong>Participation cap</strong> &mdash; max % of bar volume per fill</li>
+      <li><strong>Multi-bar slicing</strong> &mdash; unfilled quantity carries forward</li>
+    </ul>
+    <p>Three presets adjust all parameters automatically:</p>
+    <table>
+      <tr><th>Horizon</th><th>Max Participation (eq)</th><th>Impact Coeff</th><th>Use Case</th></tr>
+      <tr><td><code>intraday</code></td><td>2%</td><td>1.25</td><td>Sub-daily bars, tight constraints</td></tr>
+      <tr><td><code>swing</code></td><td>8%</td><td>1.0</td><td>Daily bars, typical strategies</td></tr>
+      <tr><td><code>longterm</code></td><td>15%</td><td>0.8</td><td>Weekly rebalance, portfolio allocation</td></tr>
+    </table>
+
+  </main>
+</div>
+
+<footer>
+  <p>cobweb.market &copy; 2025 &middot; <a href="https://github.com/cobwebSim/StockSim-">GitHub</a> &middot; <a href="https://web-production-83f3e.up.railway.app/docs">API</a></p>
+</footer>
+
+</body>
+</html>
