@@ -79,5 +79,5 @@ Horizon presets:
 - Documentation: https://cobweb.market/docs.html
 - Blog: https://cobweb.market/blog.html
 - API docs (Swagger): https://web-production-83f3e.up.railway.app/docs
-- GitHub: https://github.com/cobwebSim/StockSim-
+- GitHub: https://github.com/cobwebSim/cobweb-py
 - PyPI: https://pypi.org/project/cobweb-py/
