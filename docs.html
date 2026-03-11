@@ -73,48 +73,49 @@
 
     <!-- ────── QUICKSTART ────── -->
     <h2 id="quickstart">Quickstart</h2>
-    <p>Get a full backtest running in under 30 lines. No API key required.</p>
+    <p>Get a full backtest running in under 20 lines. No API key required.</p>
 
-    <pre><span class="cm"># pip install cobweb-py yfinance plotly</span>
+    <pre><span class="cm"># pip install cobweb-py[all]</span>
 
-<span class="kw">import</span> yfinance <span class="kw">as</span> yf
-<span class="kw">from</span> cobweb_py <span class="kw">import</span> CobwebSim, BacktestConfig, fix_timestamps, print_signal
-<span class="kw">from</span> cobweb_py.plots <span class="kw">import</span> save_equity_plot, save_metrics_table
+<span class="kw">import</span> cobweb_py <span class="kw">as</span> cw
 
 <span class="cm"># 1. Grab SPY data</span>
-df = yf.<span class="fn">download</span>(<span class="str">"SPY"</span>, start=<span class="str">"2020-01-01"</span>, end=<span class="str">"2024-12-31"</span>)
-df.columns = df.columns.<span class="fn">get_level_values</span>(<span class="num">0</span>)
-df = df.<span class="fn">reset_index</span>().<span class="fn">rename</span>(columns={<span class="str">"Date"</span>: <span class="str">"timestamp"</span>})
-rows = df[[<span class="str">"timestamp"</span>,<span class="str">"Open"</span>,<span class="str">"High"</span>,<span class="str">"Low"</span>,<span class="str">"Close"</span>,<span class="str">"Volume"</span>]].<span class="fn">to_dict</span>(<span class="str">"records"</span>)
-data = <span class="fn">fix_timestamps</span>(rows)
+df = cw.<span class="fn">from_yfinance</span>(<span class="str">"SPY"</span>, <span class="str">"2020-01-01"</span>, <span class="str">"2024-12-31"</span>)
 
 <span class="cm"># 2. Connect (free, no key needed)</span>
-sim = <span class="fn">CobwebSim</span>(<span class="str">"https://web-production-83f3e.up.railway.app"</span>)
+sim = cw.<span class="fn">CobwebSim</span>(<span class="str">"https://web-production-83f3e.up.railway.app"</span>)
 
-<span class="cm"># 3. Simple momentum: long when price &gt; 50-day SMA</span>
-close = df[<span class="str">"Close"</span>].values
-sma50 = df[<span class="str">"Close"</span>].<span class="fn">rolling</span>(<span class="num">50</span>).<span class="fn">mean</span>().values
-signals = [<span class="num">1.0</span> <span class="kw">if</span> c &gt; s <span class="kw">else</span> <span class="num">0.0</span> <span class="kw">for</span> c, s <span class="kw">in</span> <span class="fn">zip</span>(close, sma50)]
+<span class="cm"># 3. Enrich to get SMA-50, then momentum: long when price &gt; SMA-50</span>
+rows = sim.<span class="fn">enrich_rows</span>(df, feature_ids=[<span class="num">12</span>])
+signals = [<span class="num">1.0</span> <span class="kw">if</span> (r.<span class="fn">get</span>(<span class="str">"sma_50"</span>) <span class="kw">and</span> r[<span class="str">"Close"</span>] &gt; r[<span class="str">"sma_50"</span>]) <span class="kw">else</span> <span class="num">0.0</span> <span class="kw">for</span> r <span class="kw">in</span> rows]
 signals[:<span class="num">50</span>] = [<span class="num">0.0</span>] * <span class="num">50</span>
 
 <span class="cm"># 4. Backtest with realistic friction</span>
-bt = sim.<span class="fn">backtest</span>(data, signals=signals,
-    config=<span class="fn">BacktestConfig</span>(exec_horizon=<span class="str">"swing"</span>, initial_cash=<span class="num">100_000</span>))
+bt = sim.<span class="fn">backtest</span>(
+    rows, signals=signals,
+    config=cw.<span class="fn">BacktestConfig</span>(exec_horizon=<span class="str">"swing"</span>, initial_cash=<span class="num">100_000</span>),
+)
 
 <span class="cm"># 5. Results</span>
-<span class="fn">print</span>(f<span class="str">"Return: {bt['metrics']['total_return']:.2%}"</span>)
-<span class="fn">print</span>(f<span class="str">"Sharpe: {bt['metrics']['sharpe_ann']:.2f}"</span>)
-<span class="fn">print_signal</span>(bt)
-<span class="fn">save_equity_plot</span>(bt, out_html=<span class="str">"equity.html"</span>)
-<span class="fn">save_metrics_table</span>(bt, out_html=<span class="str">"metrics.html"</span>)</pre>
+<span class="kw">for</span> label, val <span class="kw">in</span> cw.<span class="fn">format_metrics</span>(bt).items():
+    <span class="fn">print</span>(f<span class="str">"{label}: {val}"</span>)
+cw.<span class="fn">print_signal</span>(bt)
+cw.plots.<span class="fn">save_equity_plot</span>(bt, out_html=<span class="str">"equity.html"</span>)
+cw.plots.<span class="fn">save_metrics_table</span>(bt, out_html=<span class="str">"metrics.html"</span>)</pre>
 
     <!-- ────── INSTALLATION ────── -->
     <h2 id="installation">Installation</h2>
-    <pre><span class="cm"># Base SDK (API calls only)</span>
+    <pre><span class="cm"># Base SDK (requests + pandas)</span>
 pip install cobweb-py
 
-<span class="cm"># With visualization (adds pandas + plotly)</span>
-pip install cobweb-py[viz]</pre>
+<span class="cm"># With Yahoo Finance helper</span>
+pip install cobweb-py[yahoo]
+
+<span class="cm"># With Plotly visualization</span>
+pip install cobweb-py[viz]
+
+<span class="cm"># Everything (yfinance + plotly)</span>
+pip install cobweb-py[all]</pre>
     <p>Requires <strong>Python 3.9+</strong>.</p>
 
     <!-- ────── CLIENT ────── -->
@@ -129,12 +130,20 @@ pip install cobweb-py[viz]</pre>
     <h3>sim.health()</h3>
     <p>Check API status. Returns <code>{"status": "ok", "version": "0.1.0"}</code>.</p>
 
+    <h3>cw.from_yfinance(ticker, start, end)</h3>
+    <p>Download OHLCV data from Yahoo Finance and return a clean DataFrame. Requires <code>pip install cobweb-py[yahoo]</code>.</p>
+    <pre>df = cw.<span class="fn">from_yfinance</span>(<span class="str">"AAPL"</span>, <span class="str">"2020-01-01"</span>, <span class="str">"2024-12-31"</span>)</pre>
+
     <h3>sim.enrich(data, feature_ids)</h3>
-    <p>Compute technical features from OHLCV data. Returns rows with feature columns appended. Alias: <code>sim.features()</code>.</p>
+    <p>Compute technical features from OHLCV data. Returns the full response dict. Alias: <code>sim.features()</code>.</p>
     <pre>feats = sim.<span class="fn">enrich</span>(<span class="str">"stock.csv"</span>, feature_ids=[<span class="num">1</span>, <span class="num">11</span>, <span class="num">36</span>])
 rows = feats[<span class="str">"rows"</span>]              <span class="cm"># OHLCV + ret_1d, sma_20, rsi_14</span>
 cols = feats[<span class="str">"feature_columns"</span>]   <span class="cm"># ['ret_1d', 'sma_20', 'rsi_14']</span></pre>
-    <p>Accepts: CSV path, pandas DataFrame, <code>list[dict]</code>, or <code>{"rows": [...]}</code>.</p>
+
+    <h3>sim.enrich_rows(data, feature_ids)</h3>
+    <p>Shorthand that returns just the enriched rows list directly.</p>
+    <pre>rows = sim.<span class="fn">enrich_rows</span>(df, feature_ids=[<span class="num">1</span>, <span class="num">11</span>, <span class="num">36</span>])  <span class="cm"># list[dict] directly</span></pre>
+    <p>Both accept: CSV path, pandas DataFrame, <code>list[dict]</code>, or <code>{"rows": [...]}</code>.</p>
 
     <h3>sim.backtest(data, signals=, config=)</h3>
     <p>Run a full backtest with execution modeling.</p>
@@ -242,12 +251,11 @@ result2 = pipe.<span class="fn">run</span>(weights={<span class="num">36</span>:
 
     <!-- ────── PLOTS SDK ────── -->
     <h2 id="plots-sdk">Plots (SDK)</h2>
-    <p>HTML-generating convenience functions. Import from <code>cobweb_py.plots</code>:</p>
-    <pre><span class="kw">from</span> cobweb_py.plots <span class="kw">import</span> (
-    save_equity_plot, save_metrics_table, save_trades_table,
-    save_score_plot, save_price_and_score_plot, save_features_table,
-    save_api_payloads_to_html, payloads_to_figures,
-)</pre>
+    <p>All plot functions are available via the <code>cw.plots</code> namespace:</p>
+    <pre><span class="kw">import</span> cobweb_py <span class="kw">as</span> cw
+
+cw.plots.<span class="fn">save_equity_plot</span>(bt, out_html=<span class="str">"equity.html"</span>)
+cw.plots.<span class="fn">save_metrics_table</span>(bt, out_html=<span class="str">"metrics.html"</span>)</pre>
     <table>
       <tr><th>Function</th><th>Output</th></tr>
       <tr><td><code>save_equity_plot(bt)</code></td><td>Equity curve + position units</td></tr>
@@ -258,39 +266,51 @@ result2 = pipe.<span class="fn">run</span>(weights={<span class="num">36</span>:
       <tr><td><code>save_features_table(rows)</code></td><td>OHLCV + features (HTML + CSV)</td></tr>
       <tr><td><code>save_api_payloads_to_html(payloads)</code></td><td>Any API plot &rarr; HTML file</td></tr>
       <tr><td><code>payloads_to_figures(payloads)</code></td><td>API plots &rarr; Plotly figures</td></tr>
+      <tr><td><code>payload_to_df(payload)</code></td><td>Single plot payload &rarr; pandas DataFrame</td></tr>
+      <tr><td><code>save_api_payloads_to_dfs(payloads)</code></td><td>All payloads &rarr; dict of DataFrames</td></tr>
     </table>
-    <p><code>payload_to_figure</code> and <code>payloads_to_figures</code> are also available as top-level imports: <code>from cobweb_py import payloads_to_figures</code>.</p>
+    <p><code>payload_to_figure</code>, <code>payloads_to_figures</code>, and <code>payload_to_df</code> are also available as top-level imports: <code>cw.payload_to_df(p)</code>.</p>
 
     <!-- ────── UTILITIES ────── -->
     <h2 id="utilities">Utilities</h2>
-    <pre><span class="kw">from</span> cobweb_py <span class="kw">import</span> (
-    fix_timestamps, load_csv, align, to_signals,
-    print_signal, get_signal, save_table,
-    get_plot, save_all_plots,
-)
+    <pre><span class="kw">import</span> cobweb_py <span class="kw">as</span> cw
+
+<span class="cm"># Download data from Yahoo Finance</span>
+df = cw.<span class="fn">from_yfinance</span>(<span class="str">"AAPL"</span>, <span class="str">"2020-01-01"</span>, <span class="str">"2024-12-31"</span>)
 
 <span class="cm"># Normalize timestamps for the API</span>
-data = <span class="fn">fix_timestamps</span>(rows, dayfirst=<span class="kw">True</span>)
+data = cw.<span class="fn">fix_timestamps</span>(rows, dayfirst=<span class="kw">True</span>)
 
 <span class="cm"># Load CSV with auto-detection</span>
-data = <span class="fn">load_csv</span>(<span class="str">"stock.csv"</span>)
+data = cw.<span class="fn">load_csv</span>(<span class="str">"stock.csv"</span>)
 
 <span class="cm"># Align two datasets by timestamp</span>
-asset, bench = <span class="fn">align</span>(asset_data, benchmark_data)
+asset, bench = cw.<span class="fn">align</span>(asset_data, benchmark_data)
 
 <span class="cm"># Get current signal from backtest</span>
-<span class="fn">print_signal</span>(bt)   <span class="cm"># Signal: BUY   |  exposure=+0.87  |  strength=0.72</span>
-s = <span class="fn">get_signal</span>(bt)  <span class="cm"># {"signal": "buy", "exposure": 0.87, "strength": 0.72}</span>
+cw.<span class="fn">print_signal</span>(bt)   <span class="cm"># Signal: BUY   |  exposure=+0.87  |  strength=0.72</span>
+s = cw.<span class="fn">get_signal</span>(bt)  <span class="cm"># {"signal": "buy", "exposure": 0.87, "strength": 0.72}</span>
 
-<span class="cm"># Save a lightweight HTML table</span>
-<span class="fn">save_table</span>(rows, <span class="str">"out.html"</span>, title=<span class="str">"My Table"</span>)
+<span class="cm"># Convert signal float to label</span>
+cw.<span class="fn">signal_label</span>(<span class="num">1.0</span>)   <span class="cm"># "BUY"</span>
+cw.<span class="fn">signal_label</span>(<span class="num">-1.0</span>)  <span class="cm"># "SELL"</span>
+cw.<span class="fn">signal_label</span>(<span class="num">0.0</span>)   <span class="cm"># "HOLD"</span>
+
+<span class="cm"># Format backtest metrics with labels</span>
+cw.<span class="fn">format_metrics</span>(bt)  <span class="cm"># {"Total Return": "23.45%", "Sharpe Ratio": "1.32", ...}</span>
+
+<span class="cm"># Convert a plot payload to a pandas DataFrame</span>
+df = cw.<span class="fn">payload_to_df</span>(payload)
+
+<span class="cm"># Save a lightweight HTML table (auto-creates directories)</span>
+cw.<span class="fn">save_table</span>(rows, <span class="str">"out/table.html"</span>, title=<span class="str">"My Table"</span>)
 
 <span class="cm"># Fetch a single plot (auto-handles benchmark/regime/correlation deps)</span>
-pl = <span class="fn">get_plot</span>(sim, data, bt, <span class="num">5</span>)              <span class="cm"># by ID</span>
-pl = <span class="fn">get_plot</span>(sim, data, bt, <span class="str">"sharpe"</span>)       <span class="cm"># by fuzzy name</span>
+pl = cw.<span class="fn">get_plot</span>(sim, data, bt, <span class="num">5</span>)              <span class="cm"># by ID</span>
+pl = cw.<span class="fn">get_plot</span>(sim, data, bt, <span class="str">"sharpe"</span>)       <span class="cm"># by fuzzy name</span>
 
 <span class="cm"># Fetch and save all plots as HTML</span>
-<span class="fn">save_all_plots</span>(sim, data, bt, <span class="fn">range</span>(<span class="num">1</span>, <span class="num">28</span>), out_dir=<span class="str">"out/plots"</span>)</pre>
+cw.<span class="fn">save_all_plots</span>(sim, data, bt, <span class="fn">range</span>(<span class="num">1</span>, <span class="num">28</span>), out_dir=<span class="str">"out/plots"</span>)</pre>
 
     <!-- ────── API OVERVIEW ────── -->
     <h2 id="api-overview">API Overview</h2>

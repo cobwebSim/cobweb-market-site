@@ -53,7 +53,7 @@
     "description": "Python backtesting API with realistic execution modeling — slippage, spread, and market impact. 71 technical features, 27 chart types.",
     "url": "https://cobweb.market",
     "downloadUrl": "https://pypi.org/project/cobweb-py/",
-    "softwareVersion": "0.1.0",
+    "softwareVersion": "0.1.6",
     "programmingLanguage": "Python"
   }
   </script>
@@ -108,7 +108,7 @@
     <div class="stat-label">Execution horizons</div>
   </div>
   <div class="stat">
-    <div class="stat-num">&lt;30</div>
+    <div class="stat-num">&lt;20</div>
     <div class="stat-label">Lines to backtest</div>
   </div>
 </div>
@@ -138,7 +138,7 @@
   <div class="card">
     <div class="card-icon">&#x1F40D;</div>
     <h3>Python SDK</h3>
-    <p><code>pip install cobweb-py</code> &mdash; accepts CSV, DataFrame, or JSON. Includes scoring, signal generation, and Plotly chart helpers.</p>
+    <p><code>pip install cobweb-py[all]</code> &mdash; accepts CSV, DataFrame, or JSON. Built-in Yahoo Finance helper, scoring, signal generation, and Plotly chart helpers.</p>
   </div>
   <div class="card">
     <div class="card-icon">&#x1F310;</div>
@@ -149,34 +149,29 @@
 
 <!-- ── Quick Example ── -->
 <section class="section">
-  <h2>30 lines to a full backtest</h2>
+  <h2>14 lines to a full backtest</h2>
   <p class="section-sub">Grab data, compute features, generate signals, and backtest with realistic friction.</p>
-  <pre><span class="kw">import</span> yfinance <span class="kw">as</span> yf
-<span class="kw">from</span> cobweb_py <span class="kw">import</span> CobwebSim, BacktestConfig, fix_timestamps, print_signal
-<span class="kw">from</span> cobweb_py.plots <span class="kw">import</span> save_equity_plot
+  <pre><span class="kw">import</span> cobweb_py <span class="kw">as</span> cw
 
 <span class="cm"># Grab SPY data</span>
-df = yf.<span class="fn">download</span>(<span class="str">"SPY"</span>, start=<span class="str">"2020-01-01"</span>, end=<span class="str">"2024-12-31"</span>)
-df.columns = df.columns.<span class="fn">get_level_values</span>(<span class="num">0</span>)
-df = df.<span class="fn">reset_index</span>().<span class="fn">rename</span>(columns={<span class="str">"Date"</span>: <span class="str">"timestamp"</span>})
-rows = df[[<span class="str">"timestamp"</span>,<span class="str">"Open"</span>,<span class="str">"High"</span>,<span class="str">"Low"</span>,<span class="str">"Close"</span>,<span class="str">"Volume"</span>]].<span class="fn">to_dict</span>(<span class="str">"records"</span>)
-data = <span class="fn">fix_timestamps</span>(rows)
+df = cw.<span class="fn">from_yfinance</span>(<span class="str">"SPY"</span>, <span class="str">"2020-01-01"</span>, <span class="str">"2024-12-31"</span>)
 
 <span class="cm"># Connect (free, no key needed)</span>
-sim = <span class="fn">CobwebSim</span>(<span class="str">"https://web-production-83f3e.up.railway.app"</span>)
+sim = cw.<span class="fn">CobwebSim</span>(<span class="str">"https://web-production-83f3e.up.railway.app"</span>)
 
-<span class="cm"># Simple momentum: long when price &gt; 50-day SMA</span>
-close = df[<span class="str">"Close"</span>].values
-sma50 = df[<span class="str">"Close"</span>].<span class="fn">rolling</span>(<span class="num">50</span>).<span class="fn">mean</span>().values
-signals = [<span class="num">1.0</span> <span class="kw">if</span> c &gt; s <span class="kw">else</span> <span class="num">0.0</span> <span class="kw">for</span> c, s <span class="kw">in</span> <span class="fn">zip</span>(close, sma50)]
+<span class="cm"># Enrich to get SMA-50, then momentum: long when price &gt; SMA-50</span>
+rows = sim.<span class="fn">enrich_rows</span>(df, feature_ids=[<span class="num">12</span>])
+signals = [<span class="num">1.0</span> <span class="kw">if</span> (r.<span class="fn">get</span>(<span class="str">"sma_50"</span>) <span class="kw">and</span> r[<span class="str">"Close"</span>] &gt; r[<span class="str">"sma_50"</span>]) <span class="kw">else</span> <span class="num">0.0</span> <span class="kw">for</span> r <span class="kw">in</span> rows]
 signals[:<span class="num">50</span>] = [<span class="num">0.0</span>] * <span class="num">50</span>
 
 <span class="cm"># Backtest with realistic friction</span>
-bt = sim.<span class="fn">backtest</span>(data, signals=signals,
-    config=<span class="fn">BacktestConfig</span>(exec_horizon=<span class="str">"swing"</span>, initial_cash=<span class="num">100_000</span>))
+bt = sim.<span class="fn">backtest</span>(
+    rows, signals=signals,
+    config=cw.<span class="fn">BacktestConfig</span>(exec_horizon=<span class="str">"swing"</span>, initial_cash=<span class="num">100_000</span>),
+)
 
-<span class="fn">print_signal</span>(bt)
-<span class="fn">save_equity_plot</span>(bt, out_html=<span class="str">"equity.html"</span>)</pre>
+cw.<span class="fn">print_signal</span>(bt)
+cw.plots.<span class="fn">save_equity_plot</span>(bt, out_html=<span class="str">"equity.html"</span>)</pre>
 </section>
 
 <!-- ── Footer ── -->
