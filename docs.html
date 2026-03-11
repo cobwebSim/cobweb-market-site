@@ -309,6 +309,9 @@ cw.<span class="fn">save_table</span>(rows, <span class="str">"out/table.html"</
 pl = cw.<span class="fn">get_plot</span>(sim, data, bt, <span class="num">5</span>)              <span class="cm"># by ID</span>
 pl = cw.<span class="fn">get_plot</span>(sim, data, bt, <span class="str">"sharpe"</span>)       <span class="cm"># by fuzzy name</span>
 
+<span class="cm"># Fetch a plot and return it directly as a DataFrame (one-liner)</span>
+df = cw.<span class="fn">get_plot_df</span>(sim, data, bt, <span class="num">3</span>, benchmark_rows=bench)
+
 <span class="cm"># Fetch and save all plots as HTML</span>
 cw.<span class="fn">save_all_plots</span>(sim, data, bt, <span class="fn">range</span>(<span class="num">1</span>, <span class="num">28</span>), out_dir=<span class="str">"out/plots"</span>)</pre>
 
